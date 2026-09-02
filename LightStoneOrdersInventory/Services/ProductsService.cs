@@ -20,7 +20,7 @@ namespace LightStoneOrdersInventory.Services
             return _productRepository.GetProducts();
         }
 
-        public Task<bool> AdjustStockItemsAsync(IEnumerable<LightStoneOrdersInventory.DTOs.OrderItemDto> items)
+        public Task<bool> AdjustStockItemsAsync(IEnumerable<DTOs.OrderItemDto> items)
         {
             return _productRepository.AdjustStockItemsAsync(items);
         }
