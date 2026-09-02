@@ -1,0 +1,6 @@
+@LightStoneOrdersInventory_HostAddress = http://localhost:5239
+
+GET {{LightStoneOrdersInventory_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
