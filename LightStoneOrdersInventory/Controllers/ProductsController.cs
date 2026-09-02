@@ -3,52 +3,60 @@ using Microsoft.EntityFrameworkCore;
 using LightStoneOrdersInventory.Data;
 using LightStoneOrdersInventory.DTOs;
 using LightStoneOrdersInventory.Models;
+using LightStoneOrdersInventory.Services.Interfaces;
 
-namespace OrdersInventory.Api.Controllers;
+namespace LightStoneOrdersInventory.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 public class ProductsController : ControllerBase
 {
-    private readonly OrdersDbContext _db;
+    
     private readonly ILogger<ProductsController> _logger;
+    private readonly IProductService _productService;
 
-    public ProductsController(OrdersDbContext db, ILogger<ProductsController> logger)
+    public ProductsController( ILogger<ProductsController> logger, IProductService productService)
     {
-        _db = db;
         _logger = logger;
+        _productService = productService;
     }
 
     [HttpPost]
     public async Task<IActionResult> Create(ProductCreateDto dto)
     {
-        if (await _db.Products.AnyAsync(p => p.Sku == dto.Sku))
-            return Conflict(new { error = "sku_exists" });
-
-        var p = new Product { Sku = dto.Sku, Name = dto.Name, Price = dto.Price, Stock = dto.InitialStock };
-        _db.Products.Add(p);
-        await _db.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(Get), new { sku = p.Sku }, p);
+        if(dto == null || string.IsNullOrWhiteSpace(dto.Sku) || string.IsNullOrWhiteSpace(dto.Name) || dto.Price < 0)
+        {
+            return BadRequest(new { error = "invalid_request" });
+        }
+        try
+        {
+            var product = new Product
+            {
+                Sku = dto.Sku,
+                Name = dto.Name,
+                Price = dto.Price,
+            };
+            _productService.AddProduct(product);
+            return CreatedAtAction(nameof(Get), new { sku = product.Sku }, product);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating product");
+            return BadRequest(new { error = "invalid_request" });
+        }
     }
 
     [HttpGet("{sku}")]
     public async Task<IActionResult> Get(string sku)
     {
-        var p = await _db.Products.SingleOrDefaultAsync(x => x.Sku == sku);
-        if (p == null) return NotFound();
-        return Ok(p);
+        return Ok(_productService.GetProducts().FirstOrDefault(p => p.Sku == sku));
     }
 
     [HttpPatch("{sku}/stock")]
-    public async Task<IActionResult> AdjustStock(string sku, StockAdjustDto dto)
+    public async Task<IActionResult> AdjustStock(string sku, IEnumerable<OrderItemDto> items)
     {
-        var p = await _db.Products.SingleOrDefaultAsync(x => x.Sku == sku);
-        if (p == null) return NotFound();
-        p.Stock += dto.Delta;
-        if (p.Stock < 0) p.Stock = 0;
-        _db.Products.Update(p);
-        await _db.SaveChangesAsync();
-        return Ok(p);
+
+        await _productService.AdjustStockItemsAsync(items);
+        return Ok();
     }
 }
