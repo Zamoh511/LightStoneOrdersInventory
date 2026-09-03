@@ -35,6 +35,7 @@ public class ProductsController : ControllerBase
                 Sku = dto.Sku,
                 Name = dto.Name,
                 Price = dto.Price,
+                AvailableStock = dto.InitialStock
             };
             _productService.AddProduct(product);
             return CreatedAtAction(nameof(Get), new { sku = product.Sku }, product);

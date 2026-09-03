@@ -35,7 +35,6 @@ public class OrdersService : IOrdersService
         if (order == null) throw new ArgumentNullException(nameof(order));
         if (order.Items == null || !order.Items.Any()) throw new ArgumentException("Order must contain at least one item", nameof(order));
 
-        // Resolve products by SKU to set ProductId and UnitPrice (prevents FK conflicts)
         var products = _productService.GetProducts().ToDictionary(p => p.Sku, StringComparer.OrdinalIgnoreCase);
 
         var Order = new Order
@@ -79,7 +78,6 @@ public class OrdersService : IOrdersService
 
     public IEnumerable<SalesReport> GetSalesReport(DateTime startDate, DateTime endDate)
     {
-        
         return _reportsRepository.GetSalesReport(startDate, endDate);
     }
 
