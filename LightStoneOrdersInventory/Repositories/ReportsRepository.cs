@@ -19,15 +19,19 @@ namespace LightStoneOrdersInventory.Repositories
             conn.Open();
            
             var query = @"SELECT
-                                OrderDate,
-                                MAX(DayTotalQuantity)    AS DayTotalQuantity,
-                                MAX(DayTotalGrossAmount) AS DayTotalGrossAmount,
-                                MAX(DayOrderCount)       AS DayOrderCount
+                            OrderDate,
+                            ProductId,
+                            ProductName,
+                            ProductQuantity,
+                            ProductGrossAmount,
+                            ProductOrderCount,
+                            DayTotalQuantity,
+                            DayTotalGrossAmount,
+                            DayOrderCount
                             FROM dbo.vDailySalesByProduct
-                            WHERE OrderDate >= @startDate
-                              AND OrderDate <= @endDate
-                            GROUP BY OrderDate
-                            ORDER BY OrderDate;";
+                          WHERE OrderDate >= @startDate
+                            AND OrderDate <  @endDate
+                          ORDER BY OrderDate, ProductName;";
             var report = conn.Query<SalesReport>(query,new {startDate =startDate, endDate = endDate }).ToList();
             return report;
         }

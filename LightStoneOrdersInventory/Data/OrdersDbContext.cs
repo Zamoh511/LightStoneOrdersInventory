@@ -44,8 +44,8 @@ public static class SeedData
     {
         if (await db.Products.AnyAsync()) return;
 
-        db.Products.Add(new Product { Sku = "SKU-001", Name = "Wireless Mouse", Price = 24.99m, Stock = 50 });
-        db.Products.Add(new Product { Sku = "SKU-002", Name = "Mechanical Keyboard", Price = 79.99m, Stock = 20 });
+        db.Products.Add(new Product { Sku = "SKU-001", Name = "Wireless Mouse", Price = 24.99m, AvailableStock = 50 });
+        db.Products.Add(new Product { Sku = "SKU-002", Name = "Mechanical Keyboard", Price = 79.99m, AvailableStock = 20 });
         await db.SaveChangesAsync();
     }
 }

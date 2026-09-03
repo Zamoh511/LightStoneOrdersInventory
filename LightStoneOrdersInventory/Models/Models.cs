@@ -13,7 +13,7 @@ public class Product
     public string Sku { get; set; } = null!;
     public string Name { get; set; } = null!;
     public decimal Price { get; set; }
-    public int Stock { get; set; }
+    public int AvailableStock { get; set; }
 }
 
 public class Order
@@ -44,4 +44,9 @@ public class SalesReport
     public int DayTotalQuantity { get; set; }
     public decimal DayTotalGrossAmount { get; set; }
     public int DayOrderCount { get; set; }
+    public string ProductName { get; set; }
+    public int ProductQuantity { get; set; }
+    public decimal ProductGrossAmount { get; set; }
+    public int ProductOrderCount { get; set; }
+   
 }
