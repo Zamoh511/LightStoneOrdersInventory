@@ -13,12 +13,27 @@ namespace LightStoneOrdersInventory.Repositories
             _connectionString = config.GetConnectionString("DefaultConnection") ?? string.Empty;
         }
 
-        public void AddOrder(Order order)
+        public int AddOrder(Order order)
         {
             using var conn = new SqlConnection(_connectionString);
             conn.Open();
 
-            conn.Execute("INSERT INTO Orders (CustomerId, ProductId, Quantity) VALUES (@CustomerId, @ProductId, @Quantity)", order);
+            return conn.QuerySingle<int>(@"BEGIN TRY 
+                                INSERT INTO Orders (ExternalOrderId, PlacedAt, CreatedAt) 
+                                VALUES (@ExternalOrderId, GETDATE(), GETDATE()) 
+                                SELECT CAST(SCOPE_IDENTITY() AS INT) AS OrderId;
+                                END TRY
+                                BEGIN CATCH
+                                    THROW;
+                                END CATCH", order);
+        }
+
+        public void AddOrderItem(OrderItem orderItem)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            conn.Open();
+
+            conn.Execute("INSERT INTO OrderItems (OrderId, ProductId, Quantity, UnitPrice) VALUES (@OrderId, @ProductId, @Quantity, @UnitPrice)", orderItem);
         }
 
         public List<Order> GetOrders()
@@ -26,9 +41,40 @@ namespace LightStoneOrdersInventory.Repositories
             using var conn = new SqlConnection(_connectionString);
             conn.Open();
 
-            var sql = "SELECT Id, CustomerId, ProductId, Quantity FROM Orders";
+            var sql = "SELECT Id, ExternalOrderId, PlacedAt, Status FROM Orders";
             var orders = conn.Query<Order>(sql).ToList();
             return orders;
+        }
+
+        public int AddOrderWithItems(Order order)
+        {
+            using var conn = new SqlConnection(_connectionString);
+            conn.Open();
+            using var tran = conn.BeginTransaction();
+
+            try
+            {
+                // Insert order and get id
+                var orderId = conn.QuerySingle<int>(@"INSERT INTO Orders (ExternalOrderId, PlacedAt, CreatedAt) 
+                                                    VALUES (@ExternalOrderId, GETDATE(), GETDATE()); 
+                                                    SELECT CAST(SCOPE_IDENTITY() AS INT) AS OrderId;", order, tran);
+
+                // Insert items
+                const string itemSql = "INSERT INTO OrderItems (OrderId, ProductId, Quantity, UnitPrice) VALUES (@OrderId, @ProductId, @Quantity, @UnitPrice)";
+                foreach (var item in order.Items)
+                {
+                    item.OrderId = orderId;
+                    conn.Execute(itemSql, item, tran);
+                }
+
+                tran.Commit();
+                return orderId;
+            }
+            catch
+            {
+                try { tran.Rollback(); } catch { }
+                throw;
+            }
         }
     }
 }

@@ -37,3 +37,11 @@ public class OrderItem
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
 }
+
+public class SalesReport
+{
+    public DateTime OrderDate { get; set; }
+    public int DayTotalQuantity { get; set; }
+    public decimal DayTotalGrossAmount { get; set; }
+    public int DayOrderCount { get; set; }
+}

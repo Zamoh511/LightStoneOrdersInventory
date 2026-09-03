@@ -22,14 +22,15 @@ namespace LightStoneOrdersInventory.Repositories
         {
             using var conn = new SqlConnection(_connectionString);
             conn.Open();
-            conn.Execute("INSERT INTO Products (Sku, Name, Price, Stock) VALUES (@Sku, @Name, @Price, @Stock)", product);
+            conn.Execute("INSERT INTO dbo.Products (Sku, Name, Price, AvailableStock) VALUES (@Sku, @Name, @Price, @Stock)", product);
         }
 
         public List<Product> GetProducts()
         {
             using var conn = new SqlConnection(_connectionString);
             conn.Open();
-            var query = "SELECT Id, Sku, Name, Price, Stock FROM Products";
+            // Alias DB column names to the Product model property names so Dapper maps correctly
+            var query = "SELECT ProductId AS Id, Sku, Name, Price, AvailableStock AS Stock FROM dbo.Products";
             var products = conn.Query<Product>(query).ToList();
             return products;
         }
@@ -50,7 +51,7 @@ namespace LightStoneOrdersInventory.Repositories
             {
                 // Acquire update locks on the target rows to prevent concurrent modifications
                 var skus = requiredBySku.Keys.ToArray();
-                var selectSql = "SELECT Id, Sku, Stock FROM Products WITH (UPDLOCK, ROWLOCK) WHERE Sku IN @Skus";
+                var selectSql = "SELECT ProductId, Sku, AvailableStock FROM Products WITH (UPDLOCK, ROWLOCK) WHERE Sku IN @Skus";
                 var products = (await conn.QueryAsync<Product>(selectSql, new { Skus = skus }, tran)).ToList();
 
                 // Ensure all requested SKUs exist and have sufficient stock
@@ -67,7 +68,7 @@ namespace LightStoneOrdersInventory.Repositories
                 }
 
                 // Perform the decrements (rows are locked so this is safe)
-                const string updateSql = "UPDATE Products SET Stock = Stock - @Qty WHERE Sku = @Sku";
+                const string updateSql = "UPDATE Products SET AvailableStock = AvailableStock - @Qty WHERE Sku = @Sku";
                 foreach (var kv in requiredBySku)
                 {
                     await conn.ExecuteAsync(updateSql, new { Sku = kv.Key, Qty = kv.Value }, tran);
