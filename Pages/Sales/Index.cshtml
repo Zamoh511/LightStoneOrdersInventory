@@ -1,0 +1,180 @@
+@page
+@model LightStoneOrdersInventory.Pages.Sales.IndexModel
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sales Report - LightStone</title>
+  <style>
+    :root{--accent:#0b5cff;--muted:#6b7280}
+    body{font-family:Segoe UI, Roboto, Arial, sans-serif;margin:0;padding:24px;background:#f7fafc;color:#0f172a}
+    .container{max-width:1000px;margin:0 auto}
+    header h1{margin:0;font-size:28px}
+    header p{margin:4px 0 18px;color:var(--muted)}
+    .controls{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+    .controls label{display:flex;flex-direction:column;font-size:13px}
+    input[type=date]{padding:8px;border:1px solid #d1d5db;border-radius:6px}
+    button{background:var(--accent);color:white;border:none;padding:10px 16px;border-radius:6px;cursor:pointer}
+    button:disabled{opacity:0.6;cursor:not-allowed}
+    .cards{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+    .card{background:white;padding:12px;border-radius:8px;flex:1;min-width:180px;box-shadow:0 1px 2px rgba(15,23,42,0.06)}
+    .card h3{margin:0;font-size:12px;color:var(--muted)}
+    .card p{margin:6px 0 0;font-size:20px;font-weight:600}
+    table{width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden}
+    th,td{padding:10px;text-align:left;border-bottom:1px solid #eef2f7}
+    th{background:#f8fafc;color:var(--muted);font-weight:600}
+    tfoot td{font-weight:700}
+    .muted{color:var(--muted)}
+    .message{padding:12px;background:#fff3cd;border:1px solid #ffeeba;border-radius:6px;color:#664d03}
+    @media(max-width:700px){.controls{flex-direction:column}.cards{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Sales Report</h1>
+      <p>LightStone Orders & Inventory Service</p>
+    </header>
+
+    <section class="controls" aria-label="filters">
+      <label>Start Date
+        <input id="startDate" type="date" />
+      </label>
+      <label>End Date
+        <input id="endDate" type="date" />
+      </label>
+      <div style="display:flex;align-items:end">
+        <button id="generateBtn">Generate Report</button>
+      </div>
+    </section>
+
+    <section class="cards" aria-live="polite">
+      <div class="card">
+        <h3>Total Quantity Sold</h3>
+        <p id="totalQty">-</p>
+      </div>
+      <div class="card">
+        <h3>Gross Sales</h3>
+        <p id="totalGross">-</p>
+      </div>
+      <div class="card">
+        <h3>Total Orders</h3>
+        <p id="totalOrders">-</p>
+      </div>
+    </section>
+
+    <section>
+      <div id="loading" class="message" style="display:none">Loading report…</div>
+      <div id="error" class="message" style="display:none"></div>
+      <div id="noData" class="message" style="display:none">No sales found for the selected date range.</div>
+
+      <table id="resultsTable" style="display:none">
+        <thead>
+          <tr><th>Date</th><th>Quantity Sold</th><th>Gross Sales</th><th>Orders</th></tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+        <tfoot>
+          <tr><td>Totals</td><td id="sumQty">0</td><td id="sumGross">R 0.00</td><td id="sumOrders">0</td></tr>
+        </tfoot>
+      </table>
+    </section>
+  </div>
+
+  <script>
+    (function(){
+      const startEl = document.getElementById('startDate');
+      const endEl = document.getElementById('endDate');
+      const btn = document.getElementById('generateBtn');
+      const loading = document.getElementById('loading');
+      const errorEl = document.getElementById('error');
+      const noData = document.getElementById('noData');
+      const table = document.getElementById('resultsTable');
+      const tbody = document.getElementById('resultsBody');
+      const totalQtyEl = document.getElementById('totalQty');
+      const totalGrossEl = document.getElementById('totalGross');
+      const totalOrdersEl = document.getElementById('totalOrders');
+      const sumQty = document.getElementById('sumQty');
+      const sumGross = document.getElementById('sumGross');
+      const sumOrders = document.getElementById('sumOrders');
+
+      const currencyFormatter = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 2 });
+      function fmtMoney(v){
+        if (v == null) return 'R 0.00';
+        try{ let s = currencyFormatter.format(v); if (!/^R\s/.test(s)) s = s.replace(/^R/, 'R '); return s; }catch(e){ return 'R ' + Number(v).toFixed(2); }
+      }
+
+      function setLoading(on){ loading.style.display = on ? 'block' : 'none'; }
+      function showError(msg){ errorEl.style.display = 'block'; errorEl.textContent = msg; }
+      function clearError(){ errorEl.style.display = 'none'; errorEl.textContent = ''; }
+      function showNoData(on){ noData.style.display = on ? 'block' : 'none'; }
+
+      function toIsoDateInput(dt){ // dt: Date
+        const y = dt.getFullYear(); const m = String(dt.getMonth()+1).padStart(2,'0'); const d = String(dt.getDate()).padStart(2,'0'); return `${y}-${m}-${d}`; }
+
+      // set sensible defaults: last 30 days
+      const today = new Date();
+      const prior = new Date(); prior.setDate(today.getDate()-30);
+      startEl.value = toIsoDateInput(prior);
+      endEl.value = toIsoDateInput(today);
+
+      async function fetchReport(sDate, eDate){
+        clearError(); showNoData(false); table.style.display='none';
+        setLoading(true); btn.disabled = true;
+        try{
+          const qs = new URLSearchParams({ startDate: sDate, endDate: eDate });
+          const res = await fetch('/api/Sales?' + qs.toString(), { method: 'GET', headers: { 'Accept':'application/json' }});
+          if (!res.ok){
+            const text = await res.text(); throw new Error('API error: ' + res.status + ' ' + text);
+          }
+          const data = await res.json();
+          if (!Array.isArray(data) || data.length === 0){
+            showNoData(true);
+            totalQtyEl.textContent = '-'; totalGrossEl.textContent='-'; totalOrdersEl.textContent='-';
+            return;
+          }
+
+          // populate table
+          tbody.innerHTML = '';
+          let totalQty = 0; let totalGross = 0; let totalOrders = 0;
+          data.forEach(row => {
+            const tr = document.createElement('tr');
+            const d = new Date(row.orderDate || row.OrderDate || row.date || row.Date);
+            const dateStr = d.toLocaleDateString();
+            const qty = Number(row.dayTotalQuantity ?? row.DayTotalQuantity ?? row.totalQty ?? 0);
+            const gross = Number(row.dayTotalGrossAmount ?? row.DayTotalGrossAmount ?? row.totalGross ?? 0);
+            const orders = Number(row.dayOrderCount ?? row.DayOrderCount ?? row.orderCount ?? 0);
+            totalQty += qty; totalGross += gross; totalOrders += orders;
+
+            tr.innerHTML = `<td>${dateStr}</td><td>${qty}</td><td>${fmtMoney(gross)}</td><td>${orders}</td>`;
+            tbody.appendChild(tr);
+          });
+
+          sumQty.textContent = totalQty;
+          sumGross.textContent = fmtMoney(totalGross);
+          sumOrders.textContent = totalOrders;
+
+          totalQtyEl.textContent = String(totalQty);
+          totalGrossEl.textContent = fmtMoney(totalGross);
+          totalOrdersEl.textContent = String(totalOrders);
+
+          table.style.display = 'table';
+        }catch(err){
+          console.error(err);
+          showError('Failed to load sales report. ' + (err.message ?? ''));
+        }finally{
+          setLoading(false); btn.disabled = false;
+        }
+      }
+
+      btn.addEventListener('click', () => {
+        clearError();
+        const s = startEl.value; const e = endEl.value;
+        if (!s || !e){ showError('Please select both start and end dates.'); return; }
+        fetchReport(s, e);
+      });
+
+    })();
+  </script>
+</body>
+</html>

@@ -44,4 +44,9 @@ public class SalesReport
     public int DayTotalQuantity { get; set; }
     public decimal DayTotalGrossAmount { get; set; }
     public int DayOrderCount { get; set; }
+    public string ProductName { get; set; }
+    public int ProductQuantity { get; set; }
+    public decimal ProductGrossAmount { get; set; }
+    public int ProductOrderCount { get; set; }
+   
 }
